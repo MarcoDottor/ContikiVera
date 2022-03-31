@@ -55,7 +55,8 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  if( sizeof data > sizeof (int)){
+  LOG_INFO("datalen vale %d \n",datalen);
+  if( datalen > sizeof (float)){
 	//caso di vettore perchè ho sfondato la threshold	
 	int* values= (int* ) data;
 	LOG_INFO("Received array");
@@ -65,8 +66,8 @@ udp_rx_callback(struct simple_udp_connection *c,
 	LOG_INFO_("\n");
   }
   else{
-	int value= *(int* ) data;
-	LOG_INFO("Received average %d from ", value);
+	float value= *(float* ) data;
+	LOG_INFO("Received average %f from ", value);
 	LOG_INFO_6ADDR(sender_addr);
 	LOG_INFO_("\n");
   }

@@ -23,7 +23,9 @@ static struct simple_udp_connection udp_conn;
 static struct simple_udp_connection udp_conn;
 static FILE* file;
 static int* values;
-static int ind=0, avg=0;
+static int ind=0;
+static float avg=0;
+
 
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_client_process, "UDP client");
@@ -60,10 +62,10 @@ if(values==NULL) {
                       UDP_SERVER_PORT, udp_rx_callback);
 
   etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
-  while(1) {
+  while(!feof(file)) {
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
 	fscanf(file,"%d",&values[ind]);
-	LOG_INFO("\nLetto il valore %d\n", values[ind]);
+	avg=0;
 	for(int i=0; i<BUFFER_SIZE; i++){
 		avg+= values[i];	
 	}
@@ -72,20 +74,13 @@ if(values==NULL) {
 	if(avg <= THRESHOLD){		
 		/* Send to DAG root */
 		LOG_INFO("Avg under threshold");
-		LOG_INFO("Sending avg %d to ", avg);
-		LOG_INFO_6ADDR(&dest_ipaddr);
-		LOG_INFO_("\n");
+		LOG_INFO("Sending avg %f ", avg);
 		simple_udp_sendto(&udp_conn, &avg, sizeof(avg), &dest_ipaddr);
 	}
 	else{		
 		LOG_INFO("Avg over threshold");
-		LOG_INFO("Sending values ");
-		for(int i=0; i<BUFFER_SIZE;i++) LOG_INFO("%d",values[ind]);
-		LOG_INFO("to");
-		LOG_INFO_6ADDR(&dest_ipaddr);
-		LOG_INFO_("\n");
 		//magari value senza & davanti
-		simple_udp_sendto(&udp_conn, &values, sizeof(values), &dest_ipaddr);
+		simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(int), &dest_ipaddr);
 	}
       ind=(ind+1)%BUFFER_SIZE;
     } else {
