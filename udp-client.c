@@ -4,6 +4,7 @@
 #include "net/netstack.h"
 #include "net/ipv6/simple-udp.h"
 #include <stdlib.h>
+#include <string.h>
 
 #include "sys/log.h"
 #define LOG_MODULE "App"
@@ -19,16 +20,20 @@ static struct simple_udp_connection udp_conn;
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
 #define SEND_INTERVAL		  (60 * CLOCK_SECOND)
+#define INIT_INTERVAL		  (5 * CLOCK_SECOND)
 
 static struct simple_udp_connection udp_conn;
 static FILE* file;
 static int* values;
-static int ind=0;
+static int ind=0, flag=0;
+static char* fileName;
 static float avg=0;
+static process_event_t init_event;
 
 
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_client_process, "UDP client");
+//PROCESS(init_process, "init process");
 AUTOSTART_PROCESSES(&udp_client_process);
 /*---------------------------------------------------------------------------*/
 static void
@@ -40,9 +45,15 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
+  if(datalen==10*sizeof(char)){
+	fileName= (char*) data;
+	LOG_INFO("\nNome file ricevuto: %s\n",fileName);
+	process_post(&udp_client_process, init_event, fileName);
+  }
   LOG_INFO("Received response from ");
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
+  //todo aggiungere caso in cui arrivi il nome del file da aprire
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
@@ -51,17 +62,37 @@ PROCESS_THREAD(udp_client_process, ev, data)
   uip_ipaddr_t dest_ipaddr;
 
   PROCESS_BEGIN();
-if(file==NULL)	file= fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1","r");
-if(values==NULL) {
-	values= malloc(BUFFER_SIZE* sizeof(int));
-	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
-}
-
   /* Initialize UDP connection */
   simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
                       UDP_SERVER_PORT, udp_rx_callback);
-
   etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
+
+while(flag==0){
+LOG_INFO("\nNon connesso");
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+	if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr))
+		flag=1;
+    etimer_set(&periodic_timer, INIT_INTERVAL - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
+}
+flag=0;
+simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
+/*
+if(fileName==NULL || (strlen(fileName)<3)){ //problema: la connessione non è ancora allacciata quando parte questo messaggio!
+	fileName=malloc(10*sizeof (char));
+    LOG_INFO("\nIN WHILE FileName: %s\n",fileName);
+	simple_udp_sendto(&udp_conn, "Start init", 10 * sizeof(char), &dest_ipaddr);
+	LOG_INFO("Prima di process_wait_event");
+	//PROCESS_WAIT_EVENT();
+	if(ev==init_event) LOG_INFO("\nNome file: %s\n", fileName);	
+}*/
+//todo: il nome del file viene a volte assegnato a H, a volte a P, a volte rimane nullo. Indagare.
+if(file==NULL)	file= fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1","r");
+//if(file==NULL)	file= fopen(fileName,"r");
+if(values==NULL && file!=NULL) {
+	values= malloc(BUFFER_SIZE* sizeof(int));
+	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
+} 
+
   while(!feof(file)) {
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
 	fscanf(file,"%d",&values[ind]);
@@ -70,6 +101,7 @@ if(values==NULL) {
 		avg+= values[i];	
 	}
 	avg= avg/ BUFFER_SIZE;
+	//la roba sotto dentro l'if è molto importante!!!
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 	if(avg <= THRESHOLD){		
 		/* Send to DAG root */
@@ -94,4 +126,11 @@ if(values==NULL) {
 
   PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
+
+/*
+PROCESS_THREAD(init_process, ev, data){
+  PROCESS_BEGIN();
+	
+  PROCESS_END();
+}*/
+/*-------------------------------------------------------------------------*/

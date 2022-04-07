@@ -26,7 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
-
+#include <stdlib.h>
 #include "contiki.h"
 #include "net/routing/routing.h"
 #include "net/netstack.h"
@@ -42,6 +42,8 @@
 #define BUFFER_SIZE 6
 
 static struct simple_udp_connection udp_conn;
+static FILE* file;
+static char* nameToSend;
 
 PROCESS(udp_server_process, "UDP server");
 AUTOSTART_PROCESSES(&udp_server_process);
@@ -55,8 +57,17 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  LOG_INFO("datalen vale %d \n",datalen);
-  if( datalen > sizeof (float)){
+  if(datalen==6*sizeof(char)){
+//problema nella lettura dal file! Qui oramai ci arrivo!
+LOG_INFO("\nSto per mandare il nome del file\n");
+if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/settingsFile","r");
+  if(nameToSend==NULL) nameToSend=malloc(10*sizeof(char));
+  if(file!=NULL){	fgets(nameToSend,10,file);
+LOG_INFO("\nNome file mandato: %s",nameToSend);
+  simple_udp_sendto(&udp_conn, nameToSend, 10*sizeof(char), sender_addr);}
+
+}
+  else if( datalen > sizeof (float)){
 	//caso di vettore perchè ho sfondato la threshold	
 	int* values= (int* ) data;
 	LOG_INFO("Received array");
@@ -83,13 +94,12 @@ udp_rx_callback(struct simple_udp_connection *c,
 PROCESS_THREAD(udp_server_process, ev, data)
 {
   PROCESS_BEGIN();
-
   /* Initialize DAG root */
   NETSTACK_ROUTING.root_start();
-
   /* Initialize UDP connection */
   simple_udp_register(&udp_conn, UDP_SERVER_PORT, NULL,
                       UDP_CLIENT_PORT, udp_rx_callback);
+if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp.settingsFile","r");
 
   PROCESS_END();
 }
