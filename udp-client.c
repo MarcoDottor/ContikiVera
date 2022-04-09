@@ -45,15 +45,20 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  if(datalen==10*sizeof(char)){
-	fileName= (char*) data;
+LOG_INFO("\nDatalen vale: %d", datalen);
+  if(datalen>=60*sizeof(char)){
+	flag=1;
+	fileName=malloc(100*sizeof (char));
+	//fileName= strcat("/home/user/contiki-ng-mw-2122/examples/rpl-udp/",(char*) data);
+	fileName=(char*) data;
 	LOG_INFO("\nNome file ricevuto: %s\n",fileName);
 	process_post(&udp_client_process, init_event, fileName);
   }
+else{
   LOG_INFO("Received response from ");
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
-  //todo aggiungere caso in cui arrivi il nome del file da aprire
+ }
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
@@ -76,18 +81,21 @@ LOG_INFO("\nNon connesso");
 }
 flag=0;
 simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
-/*
-if(fileName==NULL || (strlen(fileName)<3)){ //problema: la connessione non è ancora allacciata quando parte questo messaggio!
-	fileName=malloc(10*sizeof (char));
-    LOG_INFO("\nIN WHILE FileName: %s\n",fileName);
-	simple_udp_sendto(&udp_conn, "Start init", 10 * sizeof(char), &dest_ipaddr);
-	LOG_INFO("Prima di process_wait_event");
-	//PROCESS_WAIT_EVENT();
-	if(ev==init_event) LOG_INFO("\nNome file: %s\n", fileName);	
+
+PROCESS_WAIT_EVENT();//entra qui!vedere come creare il percorso giusto!
+if(ev==init_event)	LOG_INFO("\nfileName: %s",fileName);
+
+/*while(flag==0 || file==NULL){
+LOG_INFO("\nFlag vale %d",flag);
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+file= fopen(fileName,"r");
+if(file==NULL) LOG_INFO("\nFILE NULLO\n");
+    etimer_set(&periodic_timer, INIT_INTERVAL - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
 }*/
-//todo: il nome del file viene a volte assegnato a H, a volte a P, a volte rimane nullo. Indagare.
-if(file==NULL)	file= fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1","r");
-//if(file==NULL)	file= fopen(fileName,"r");
+
+//DA QUI, A ME PARE CHE LA STRINGA CHE ARRIVA SIA GIUSTA, MA A QUANTO PARE NON SI RIESCE AD APRIRE IL FILE CON LEI. INDAGARE!
+if(file==NULL)	{LOG_INFO("\nFILE NULLO"); file= fopen(fileName,"r");}
+if(file==NULL)	{LOG_INFO("\nFILE ANCORA NULLO 2\n"); file= fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1","r");}
 if(values==NULL && file!=NULL) {
 	values= malloc(BUFFER_SIZE* sizeof(int));
 	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
@@ -101,7 +109,6 @@ if(values==NULL && file!=NULL) {
 		avg+= values[i];	
 	}
 	avg= avg/ BUFFER_SIZE;
-	//la roba sotto dentro l'if è molto importante!!!
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 	if(avg <= THRESHOLD){		
 		/* Send to DAG root */
