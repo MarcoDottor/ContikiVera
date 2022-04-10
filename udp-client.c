@@ -33,7 +33,6 @@ static process_event_t init_event;
 
 /*---------------------------------------------------------------------------*/
 PROCESS(udp_client_process, "UDP client");
-//PROCESS(init_process, "init process");
 AUTOSTART_PROCESSES(&udp_client_process);
 /*---------------------------------------------------------------------------*/
 static void
@@ -46,11 +45,11 @@ udp_rx_callback(struct simple_udp_connection *c,
          uint16_t datalen)
 {
 LOG_INFO("\nDatalen vale: %d", datalen);
-  if(datalen>=60*sizeof(char)){
+  if(datalen>40*sizeof(char)){
 	flag=1;
-	fileName=malloc(100*sizeof (char));
-	//fileName= strcat("/home/user/contiki-ng-mw-2122/examples/rpl-udp/",(char*) data);
-	fileName=(char*) data;
+	fileName=malloc((strlen( (char*) data))*sizeof (char));
+	strcpy(fileName,(char*) data);
+	fileName[strlen(fileName)-1]='\0';
 	LOG_INFO("\nNome file ricevuto: %s\n",fileName);
 	process_post(&udp_client_process, init_event, fileName);
   }
@@ -85,17 +84,8 @@ simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
 PROCESS_WAIT_EVENT();//entra qui!vedere come creare il percorso giusto!
 if(ev==init_event)	LOG_INFO("\nfileName: %s",fileName);
 
-/*while(flag==0 || file==NULL){
-LOG_INFO("\nFlag vale %d",flag);
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-file= fopen(fileName,"r");
-if(file==NULL) LOG_INFO("\nFILE NULLO\n");
-    etimer_set(&periodic_timer, INIT_INTERVAL - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
-}*/
-
-//DA QUI, A ME PARE CHE LA STRINGA CHE ARRIVA SIA GIUSTA, MA A QUANTO PARE NON SI RIESCE AD APRIRE IL FILE CON LEI. INDAGARE!
-if(file==NULL)	{LOG_INFO("\nFILE NULLO"); file= fopen(fileName,"r");}
-if(file==NULL)	{LOG_INFO("\nFILE ANCORA NULLO 2\n"); file= fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1","r");}
+	char* indirizzoFisso="/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1";
+if(file==NULL)	 file= fopen(fileName,"r");
 if(values==NULL && file!=NULL) {
 	values= malloc(BUFFER_SIZE* sizeof(int));
 	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
@@ -133,11 +123,4 @@ if(values==NULL && file!=NULL) {
 
   PROCESS_END();
 }
-
-/*
-PROCESS_THREAD(init_process, ev, data){
-  PROCESS_BEGIN();
-	
-  PROCESS_END();
-}*/
 /*-------------------------------------------------------------------------*/

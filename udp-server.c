@@ -59,15 +59,14 @@ udp_rx_callback(struct simple_udp_connection *c,
          uint16_t datalen)
 {
   if(datalen==6*sizeof(char)){
-//problema nella lettura dal file! Qui oramai ci arrivo!
-LOG_INFO("\nSto per mandare il nome del file\n");
+//LOG_INFO("\nSto per mandare il nome del file\n");
 if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/settingsFile","r");
   if(nameToSend==NULL) nameToSend=malloc(10*sizeof(char));
   if(fullAddress==NULL)	{fullAddress=malloc(70*sizeof(char));	
 			strcpy(fullAddress,"/home/user/contiki-ng-mw-2122/examples/rpl-udp/");}
   if(file!=NULL){	fgets(nameToSend,10,file);
 strcat(fullAddress,nameToSend);
-LOG_INFO("\nNome file mandato: %s",fullAddress);
+//LOG_INFO("\nNome file mandato: %s",fullAddress);
   simple_udp_sendto(&udp_conn, fullAddress, 70*sizeof(char), sender_addr);}
 
 }
