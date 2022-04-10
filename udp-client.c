@@ -44,7 +44,6 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-LOG_INFO("\nDatalen vale: %d", datalen);
   if(datalen>40*sizeof(char)){
 	flag=1;
 	fileName=malloc((strlen( (char*) data))*sizeof (char));
@@ -84,7 +83,6 @@ simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
 PROCESS_WAIT_EVENT();//entra qui!vedere come creare il percorso giusto!
 if(ev==init_event)	LOG_INFO("\nfileName: %s",fileName);
 
-	char* indirizzoFisso="/home/user/contiki-ng-mw-2122/examples/rpl-udp/values1";
 if(file==NULL)	 file= fopen(fileName,"r");
 if(values==NULL && file!=NULL) {
 	values= malloc(BUFFER_SIZE* sizeof(int));
