@@ -44,7 +44,7 @@
 
 static struct simple_udp_connection udp_conn;
 static FILE* file;
-static char* nameToSend,*fullAddress;
+static char* nameToSend;
 
 PROCESS(udp_server_process, "UDP server");
 AUTOSTART_PROCESSES(&udp_server_process);
@@ -59,17 +59,21 @@ udp_rx_callback(struct simple_udp_connection *c,
          uint16_t datalen)
 {
   if(datalen==6*sizeof(char)){
-//LOG_INFO("\nSto per mandare il nome del file\n");
-if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/settingsFile","r");
-  if(nameToSend==NULL) nameToSend=malloc(10*sizeof(char));
-  if(fullAddress==NULL)	fullAddress=malloc(70*sizeof(char));	
-			strcpy(fullAddress,"/home/user/contiki-ng-mw-2122/examples/rpl-udp/");
-  if(file!=NULL){	fgets(nameToSend,10,file);
-strcat(fullAddress,nameToSend);
-//LOG_INFO("\nNome file mandato: %s",fullAddress);
-  simple_udp_sendto(&udp_conn, fullAddress, 70*sizeof(char), sender_addr);}
+  //LOG_INFO("\nSto per mandare il nome del file\n");
+	if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/settingsFile","r");
+	if(nameToSend==NULL) nameToSend=malloc(10*sizeof(char));
+ 	if(file!=NULL){	
+		fgets(nameToSend,10,file);
+		//LOG_INFO("\nNome file mandato: %s",fullAddress);
+  		simple_udp_sendto(&udp_conn, nameToSend, 10*sizeof(char), sender_addr);
+	}
 
-}
+  }
+  else if(datalen==3*sizeof(float)){
+	int *values=(int*) data;	
+	LOG_INFO("\nReceived values from mobile device");
+	LOG_INFO("\n avg: %f xAvg: %f yAvg: %f\n",values[0],values[1],values[2]);
+  }
   else if( datalen > sizeof (float)){
 	//caso di vettore perchè ho sfondato la threshold	
 	int* values= (int* ) data;
