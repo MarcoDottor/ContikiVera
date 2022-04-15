@@ -69,9 +69,15 @@ udp_rx_callback(struct simple_udp_connection *c,
 	}
 
   }
+  else if(datalen==(BUFFER_SIZE+2)*sizeof(float)){
+	float *values=(float*) data;	
+	LOG_INFO("\nReceived values from mobile device\n");
+	for(int i=0; i<BUFFER_SIZE;i++)	LOG_INFO("%f ", values[i]);
+	LOG_INFO("\n xAvg: %f    yAvg: %f\n", values[BUFFER_SIZE],values[BUFFER_SIZE+1]);
+  }
   else if(datalen==3*sizeof(float)){
-	int *values=(int*) data;	
-	LOG_INFO("\nReceived values from mobile device");
+	float *values=(float*) data;	
+	LOG_INFO("\nReceived avgs from mobile device");
 	LOG_INFO("\n avg: %f xAvg: %f yAvg: %f\n",values[0],values[1],values[2]);
   }
   else if( datalen > sizeof (float)){

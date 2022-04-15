@@ -45,7 +45,7 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  if(datalen=10*sizeof(char)){
+  if(datalen==10*sizeof(char)){
 	flag=1;
 	mobileFlag= (strstr((char*) data, "values")==NULL)?1:0;
 	fileName=malloc(70*sizeof (char));
@@ -95,10 +95,11 @@ if(values==NULL && file!=NULL) {
 		yPos= malloc(BUFFER_SIZE* sizeof(int));
 	}
 } 
-
   while(!feof(file)) {
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-	fscanf(file,"%d",&values[ind]);
+	if(!mobileFlag) fscanf(file,"%d",&values[ind]);
+	else {fscanf(file,"%d,%d,%d",&values[ind],&xPos[ind],&yPos[ind]);
+		LOG_INFO("\nHo letto i valori %d %d\n",xPos[ind],yPos[ind]);}
 	avg=0, xAvg=0, yAvg=0;
 	for(int i=0; i<BUFFER_SIZE; i++){
 		avg+= values[i];	
@@ -108,25 +109,38 @@ if(values==NULL && file!=NULL) {
 		}
 	}
 	avg= avg/ BUFFER_SIZE;
+	if(mobileFlag)	{xAvg=xAvg/BUFFER_SIZE;		yAvg=yAvg/BUFFER_SIZE;}
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 	if(avg <= THRESHOLD){		
 		/* Send to DAG root */
-	   if(!mobileFlag){
-		LOG_INFO("Avg under threshold from static device");
-		LOG_INFO("Sending avg %f ", avg);
-		simple_udp_sendto(&udp_conn, &avg, sizeof(avg), &dest_ipaddr);}
-	   else{
-		if(mobileData==NULL)	mobileData=malloc (3*sizeof(float));
-		mobileData[0]=avg;
-		mobileData[1]=xAvg;
-		mobileData[2]=yAvg;
-		LOG_INFO("Avg under threshold from mobile device");
-		simple_udp_sendto(&udp_conn, mobileData, 3*sizeof(float), &dest_ipaddr);}		
-	   }	  
-	}
+		   if(!mobileFlag){
+			LOG_INFO("Avg under threshold from static device");
+			LOG_INFO("Sending avg %f ", avg);
+			simple_udp_sendto(&udp_conn, &avg, sizeof(avg), &dest_ipaddr);
+		   }
+		   else{
+			if(mobileData==NULL)	mobileData=malloc (3*sizeof(float));
+			mobileData[0]=avg;
+			mobileData[1]=xAvg;
+			mobileData[2]=yAvg;
+			LOG_INFO("Avg under threshold from mobile device");
+			simple_udp_sendto(&udp_conn, mobileData, 3*sizeof(float), &dest_ipaddr);
+		   }		
+	   }	
 	else{	//adesso devo crare il vettore che contiene i 6 valori, più la media della posizione. Poi fare la parte del server e runnare per vedere se va.	
-		LOG_INFO("Avg over threshold");
-		simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(int), &dest_ipaddr);
+		if(!mobileFlag){
+			LOG_INFO("Avg over threshold");
+			simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(int), &dest_ipaddr);
+		}
+		else{
+			LOG_INFO("Avg over threshold mobile device");
+			LOG_INFO("\nI valori letti sono: ");
+			float *arr= malloc ((BUFFER_SIZE+2)*sizeof(float));
+			for(int i=0; i<BUFFER_SIZE;i++)	{arr[i]=values[i];	LOG_INFO(" %f", arr[i]);}
+			LOG_INFO("\n");
+			arr[BUFFER_SIZE]=xAvg;	arr[BUFFER_SIZE+1]=yAvg;
+			simple_udp_sendto(&udp_conn, arr, (BUFFER_SIZE+2)* sizeof(float), &dest_ipaddr);
+		}
 	}
       ind=(ind+1)%BUFFER_SIZE;
     } else {
