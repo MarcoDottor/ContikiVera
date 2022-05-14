@@ -8,7 +8,7 @@
 
 #include "sys/log.h"
 #define LOG_MODULE "App"
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_NONE
 
 #define WITH_SERVER_REPLY  1
 #define UDP_CLIENT_PORT	8765
@@ -24,11 +24,11 @@ static struct simple_udp_connection udp_conn;
 
 static struct simple_udp_connection udp_conn;
 static FILE* file;
-static int* values, *xPos, *yPos;
-static float *mobileData;	//mobileData contains avgValue, avgX, avgY. It's used to send everything to the router
-static int ind=0, flag=0, mobileFlag=0;	//mobileFlag is 1 if the device moves, so it has a position for each value read.
+static float *xPos, *yPos, *values, *mobileData;	//mobileData contains avgValue, avgX, avgY. It's used to send everything to the router
+static int ind=0, flag=0, mobileFlag=0,	//mobileFlag is 1 if the device moves, so it has a position for each value read.
+		enough_values_flag=0; //indica se ho letto almeno sei valori, e quindi se ha senso iniziare a mandare le medie.
 static char* fileName;
-static float avg=0, xAvg=0, yAvg=0;
+static float avg=0, xAvg=0, yAvg=0,xSensor=0, ySensor=0;  //xSensor e ySensor sono i valori fissi delle coordinate di un sensore
 static process_event_t init_event;
 
 
@@ -52,7 +52,7 @@ udp_rx_callback(struct simple_udp_connection *c,
 	strcpy(fileName,"/home/user/contiki-ng-mw-2122/examples/rpl-udp/");
 	strcat(fileName,(char*) data);
 	fileName[strlen(fileName)-1]='\0';
-	LOG_INFO("\nNome file ricevuto: %s\n",fileName);
+	//LOG_INFO("\nNome file ricevuto: %s\n",fileName);
 	process_post(&udp_client_process, init_event, fileName);
   }
 else{
@@ -84,22 +84,31 @@ flag=0;
 simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
 
 PROCESS_WAIT_EVENT();//entra qui!vedere come creare il percorso giusto!
-if(ev==init_event)	LOG_INFO("\nfileName: %s",fileName);
+if(ev==init_event){}
 
 if(file==NULL)	 file= fopen(fileName,"r");
 if(values==NULL && file!=NULL) {
-	values= malloc(BUFFER_SIZE* sizeof(int));
+	values= malloc(BUFFER_SIZE* sizeof(float));
 	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
 	if(mobileFlag){
-		xPos= malloc(BUFFER_SIZE* sizeof(int));
-		yPos= malloc(BUFFER_SIZE* sizeof(int));
+		xPos= malloc(BUFFER_SIZE* sizeof(float));
+		yPos= malloc(BUFFER_SIZE* sizeof(float));
 	}
 } 
   while(!feof(file)) {
+      if(ind==5) {enough_values_flag=1;}
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-	if(!mobileFlag) fscanf(file,"%d",&values[ind]);
-	else {fscanf(file,"%d,%d,%d",&values[ind],&xPos[ind],&yPos[ind]);
-		LOG_INFO("\nHo letto i valori %d %d\n",xPos[ind],yPos[ind]);}
+	if(!mobileFlag) {
+		if(ind==0 && !enough_values_flag){
+		static float a,b;
+		fscanf(file,"%f %f",&a, &b);
+		xSensor=a; ySensor=b;
+		}
+		fscanf(file,"%f",&values[ind]);
+		LOG_INFO("\nHo letto il valore %f\n", values[ind]);
+	}
+	else {fscanf(file,"%f %f %f",&values[ind],&xPos[ind],&yPos[ind]);
+		LOG_INFO("\nHo letto i valori x:%f y:%f val:%f\n",xPos[ind],yPos[ind],values[ind]);}
 	avg=0, xAvg=0, yAvg=0;
 	for(int i=0; i<BUFFER_SIZE; i++){
 		avg+= values[i];	
@@ -110,15 +119,18 @@ if(values==NULL && file!=NULL) {
 	}
 	avg= avg/ BUFFER_SIZE;
 	if(mobileFlag)	{xAvg=xAvg/BUFFER_SIZE;		yAvg=yAvg/BUFFER_SIZE;}
+	//l'if sotto impone che il nodo sia connesso e contenga 6 valori prima di comunicare col router 
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
+	if(enough_values_flag){
 	if(avg <= THRESHOLD){		
 		/* Send to DAG root */
-		   if(!mobileFlag){
-			LOG_INFO("Avg under threshold from static device");
-			LOG_INFO("Sending avg %f ", avg);
-			simple_udp_sendto(&udp_conn, &avg, sizeof(avg), &dest_ipaddr);
+		   if(!mobileFlag){ //mando media da sensore fisso
+			LOG_INFO("Avg under threshold from static device\n");
+			LOG_INFO("Sending avg %f \n", avg);
+			float toSend[3];	toSend[0]=xSensor; toSend[1]=ySensor;	toSend[2]=avg;
+			simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float)+1, &dest_ipaddr);
 		   }
-		   else{
+		   else{	//mando media da sensore mobile
 			if(mobileData==NULL)	mobileData=malloc (3*sizeof(float));
 			mobileData[0]=avg;
 			mobileData[1]=xAvg;
@@ -130,7 +142,7 @@ if(values==NULL && file!=NULL) {
 	else{	//adesso devo crare il vettore che contiene i 6 valori, più la media della posizione. Poi fare la parte del server e runnare per vedere se va.	
 		if(!mobileFlag){
 			LOG_INFO("Avg over threshold");
-			simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(int), &dest_ipaddr);
+			simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(float), &dest_ipaddr);
 		}
 		else{
 			LOG_INFO("Avg over threshold mobile device");
@@ -141,6 +153,10 @@ if(values==NULL && file!=NULL) {
 			arr[BUFFER_SIZE]=xAvg;	arr[BUFFER_SIZE+1]=yAvg;
 			simple_udp_sendto(&udp_conn, arr, (BUFFER_SIZE+2)* sizeof(float), &dest_ipaddr);
 		}
+	}
+	}
+	else{
+		LOG_INFO("NO ABBASTANZA VALORI \n");	
 	}
       ind=(ind+1)%BUFFER_SIZE;
     } else {
