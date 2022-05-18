@@ -8,7 +8,8 @@
 
 #include "sys/log.h"
 #define LOG_MODULE "App"
-#define LOG_LEVEL LOG_LEVEL_NONE
+//#define LOG_LEVEL LOG_LEVEL_NONE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 #define WITH_SERVER_REPLY  1
 #define UDP_CLIENT_PORT	8765
@@ -19,7 +20,7 @@
 static struct simple_udp_connection udp_conn;
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
-#define SEND_INTERVAL		  (60 * CLOCK_SECOND)
+#define SEND_INTERVAL		  (10 * CLOCK_SECOND)
 #define INIT_INTERVAL		  (5 * CLOCK_SECOND)
 
 static struct simple_udp_connection udp_conn;
