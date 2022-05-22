@@ -176,6 +176,6 @@ void formatString(float x, float y, float val){
 	s1= malloc(50*sizeof(char)),s2= malloc(50*sizeof(char)),s3= malloc(50*sizeof(char));
 	sprintf(s1,"{\"x\":%s",floatAdjust(x));
 	sprintf(s2,"\"y\":%s",floatAdjust(y));
-	sprintf(s3,"\"val\":[%s]}\n",floatAdjust(val));
+	sprintf(s3,"\"val\":%s}\n",floatAdjust(val));
 	printf("%s,%s,%s",s1,s2,s3);
 }
