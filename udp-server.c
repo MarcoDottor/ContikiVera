@@ -39,7 +39,8 @@
 
 
 #define LOG_MODULE "App"
-#define LOG_LEVEL LOG_LEVEL_INFO
+//#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_NONE
 
 #define WITH_SERVER_REPLY  1
 #define UDP_CLIENT_PORT	8765
@@ -54,6 +55,10 @@ static FILE* file;
 static char* nameToSend
 //,*backend_IPv6="2620:9b::191d:727f"
 ;
+
+char* replace_char(char* str, char find, char replace);
+void formatString(float x,float y,float val);
+char* floatAdjust(float f);
 
 uip_ipaddr_t ipAddrBackend;
 
@@ -80,18 +85,20 @@ udp_rx_callback(struct simple_udp_connection *c,
 	}
 
   }
-  else if(datalen==(BUFFER_SIZE+2)*sizeof(float)){//caso di mobile device oltre treshold
+  else if(datalen==(BUFFER_SIZE+2)*sizeof(float)){//caso di mobile device oltre treshold, quindi vettore
 	float *values=(float*) data;	
 	LOG_INFO("\nReceived values from mobile device\n");
 	for(int i=0; i<BUFFER_SIZE;i++)	LOG_INFO("%f ", values[i]);
 	LOG_INFO("\n xAvg: %f    yAvg: %f\n", values[BUFFER_SIZE],values[BUFFER_SIZE+1]);
 	//printf("{\"x\":%d,\"y\":%d,\"val\":%d,%d,%d,%d,%d,%d}\n",values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[0],values[1],values[2],values[3], 		   values[4],values[5]);
 //printf("{\"x\":%f,\"y\":%f,\"val\":%f,%f,%f,%f,%f,%f}\n",values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[0],values[1],values[2],values[3], 		   values[4],values[5]);
+	for(int i=0; i<BUFFER_SIZE;i++)	formatString(values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[i]);
   }
   else if(datalen==3*sizeof(float)){//caso mobile device under therhold
 	float *values=(float*) data;	
 	LOG_INFO("\nReceived avgs from mobile device");
 	LOG_INFO("\n avg: %f xAvg: %f yAvg: %f\n",values[0],values[1],values[2]);
+	formatString(values[1],values[2],values[0]);
 	//printf("{\"x\":%f,\"y\":%f,\"val\":%f}\n",values[1],values[2],values[0]);
 	//printf("{\"x\":%d,\"y\":%d,\"val\":%d}\n",values[1],values[2],values[0]);
   }
@@ -100,12 +107,12 @@ udp_rx_callback(struct simple_udp_connection *c,
 	float *values= (float* ) data;
 	//LOG_INFO_6ADDR(sender_addr);
 	//LOG_INFO_("\n");
-	printf("{\"x\":%f,\"y\":%f,\"val\":%f}\n",values[0],values[1],values[2]);
+	printf("{\"x\":%f,\"y\":%f,\"val\":[%f]}\n",values[0],values[1],values[2]);
   }
   else if( datalen > sizeof (float)){	//caso di sensore fisso che ha sfondato la threshold	
 	float* values= (float* ) data;
 	LOG_INFO("Received array from sensor");
-	for(int i=0; i<BUFFER_SIZE; i++) printf(" %f ", values[i]);	printf("\n");
+	for(int i=0; i<BUFFER_SIZE; i++) formatString(values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[i]);
 	/*LOG_INFO("from ");
 	LOG_INFO_6ADDR(sender_addr);
 	LOG_INFO_("\n");*/
@@ -149,3 +156,26 @@ if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp.settin
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+char* replace_char(char* str, char find, char replace){
+    char *current_pos = strchr(str,find);
+    while (current_pos) {
+        *current_pos = replace;
+        current_pos = strchr(current_pos,find);
+    }
+    return str;
+}
+
+char* floatAdjust(float f){
+	char *s= malloc (50*sizeof(char));
+	s=gcvt(f,8,s);
+	return replace_char(s,',','.');
+}
+
+void formatString(float x, float y, float val){
+	char *s1,*s2,*s3;
+	s1= malloc(50*sizeof(char)),s2= malloc(50*sizeof(char)),s3= malloc(50*sizeof(char));
+	sprintf(s1,"{\"x\":%s",floatAdjust(x));
+	sprintf(s2,"\"y\":%s",floatAdjust(y));
+	sprintf(s3,"\"val\":[%s]}\n",floatAdjust(val));
+	printf("%s,%s,%s",s1,s2,s3);
+}

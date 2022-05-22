@@ -8,8 +8,8 @@
 
 #include "sys/log.h"
 #define LOG_MODULE "App"
-//#define LOG_LEVEL LOG_LEVEL_NONE
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_NONE
+//#define LOG_LEVEL LOG_LEVEL_INFO
 
 #define WITH_SERVER_REPLY  1
 #define UDP_CLIENT_PORT	8765
@@ -111,14 +111,20 @@ if(values==NULL && file!=NULL) {
 	else {fscanf(file,"%f %f %f",&values[ind],&xPos[ind],&yPos[ind]);
 		LOG_INFO("\nHo letto i valori x:%f y:%f val:%f\n",xPos[ind],yPos[ind],values[ind]);}
 	avg=0, xAvg=0, yAvg=0;
+	int buggedValues=0;
 	for(int i=0; i<BUFFER_SIZE; i++){
-		avg+= values[i];	
+		if(values[i]<-15 || values[i]>100) buggedValues++;
+		else avg+= values[i];
+		//avg+=pow(10, values[i]/10);	
 		if(mobileFlag){
 			xAvg+=xPos[i];
 			yAvg+=yPos[i];
 		}
 	}
-	avg= avg/ BUFFER_SIZE;
+	if(buggedValues<6)	avg=avg/ (BUFFER_SIZE-buggedValues);
+	else avg=0;
+	//todo: else in cui avviso che si è buggato il sensore
+	//avg=log10(avg);
 	if(mobileFlag)	{xAvg=xAvg/BUFFER_SIZE;		yAvg=yAvg/BUFFER_SIZE;}
 	//l'if sotto impone che il nodo sia connesso e contenga 6 valori prima di comunicare col router 
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
@@ -143,7 +149,10 @@ if(values==NULL && file!=NULL) {
 	else{	//adesso devo crare il vettore che contiene i 6 valori, più la media della posizione. Poi fare la parte del server e runnare per vedere se va.	
 		if(!mobileFlag){
 			LOG_INFO("Avg over threshold");
-			simple_udp_sendto(&udp_conn, values, BUFFER_SIZE* sizeof(float), &dest_ipaddr);
+			float *arr= malloc ((BUFFER_SIZE+2)*sizeof(float));
+			for(int i=0; i<BUFFER_SIZE;i++)	arr[i]=values[i];
+			arr[BUFFER_SIZE]=xAvg;	arr[BUFFER_SIZE+1]=yAvg;
+			simple_udp_sendto(&udp_conn, values, (BUFFER_SIZE+3)* sizeof(float), &dest_ipaddr);
 		}
 		else{
 			LOG_INFO("Avg over threshold mobile device");
