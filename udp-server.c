@@ -90,8 +90,6 @@ udp_rx_callback(struct simple_udp_connection *c,
 	LOG_INFO("\nReceived values from mobile device\n");
 	for(int i=0; i<BUFFER_SIZE;i++)	LOG_INFO("%f ", values[i]);
 	LOG_INFO("\n xAvg: %f    yAvg: %f\n", values[BUFFER_SIZE],values[BUFFER_SIZE+1]);
-	//printf("{\"x\":%d,\"y\":%d,\"val\":%d,%d,%d,%d,%d,%d}\n",values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[0],values[1],values[2],values[3], 		   values[4],values[5]);
-//printf("{\"x\":%f,\"y\":%f,\"val\":%f,%f,%f,%f,%f,%f}\n",values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[0],values[1],values[2],values[3], 		   values[4],values[5]);
 	for(int i=0; i<BUFFER_SIZE;i++)	formatString(values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[i]);
   }
   else if(datalen==3*sizeof(float)){//caso mobile device under therhold
@@ -99,23 +97,16 @@ udp_rx_callback(struct simple_udp_connection *c,
 	LOG_INFO("\nReceived avgs from mobile device");
 	LOG_INFO("\n avg: %f xAvg: %f yAvg: %f\n",values[0],values[1],values[2]);
 	formatString(values[1],values[2],values[0]);
-	//printf("{\"x\":%f,\"y\":%f,\"val\":%f}\n",values[1],values[2],values[0]);
-	//printf("{\"x\":%d,\"y\":%d,\"val\":%d}\n",values[1],values[2],values[0]);
   }
   else if(datalen== 1+3*sizeof(float)){		//caso di sensore fisso che NON ha sfondato la threshold
 	LOG_INFO("\nReceived avgs from sensor");	
 	float *values= (float* ) data;
-	//LOG_INFO_6ADDR(sender_addr);
-	//LOG_INFO_("\n");
-	printf("{\"x\":%f,\"y\":%f,\"val\":[%f]}\n",values[0],values[1],values[2]);
+	printf("{\"x\":%f,\"y\":%f,\"val\":%f}\n",values[0],values[1],values[2]);
   }
   else if( datalen > sizeof (float)){	//caso di sensore fisso che ha sfondato la threshold	
 	float* values= (float* ) data;
 	LOG_INFO("Received array from sensor");
 	for(int i=0; i<BUFFER_SIZE; i++) formatString(values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[i]);
-	/*LOG_INFO("from ");
-	LOG_INFO_6ADDR(sender_addr);
-	LOG_INFO_("\n");*/
   }
 	simple_udp_send(&udp_conn_back, "test", 4*sizeof(char));
 #if WITH_SERVER_REPLY

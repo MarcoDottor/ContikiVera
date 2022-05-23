@@ -111,18 +111,14 @@ if(values==NULL && file!=NULL) {
 	else {fscanf(file,"%f %f %f",&values[ind],&xPos[ind],&yPos[ind]);
 		LOG_INFO("\nHo letto i valori x:%f y:%f val:%f\n",xPos[ind],yPos[ind],values[ind]);}
 	avg=0, xAvg=0, yAvg=0;
-	int buggedValues=0;
 	for(int i=0; i<BUFFER_SIZE; i++){
-		if(values[i]<-15 || values[i]>100) buggedValues++;
-		else avg+= values[i];
-		//avg+=pow(10, values[i]/10);	
+		avg+= values[i];	
 		if(mobileFlag){
 			xAvg+=xPos[i];
 			yAvg+=yPos[i];
 		}
 	}
-	if(buggedValues<6)	avg=avg/ (BUFFER_SIZE-buggedValues);
-	else avg=0;
+	avg=avg/BUFFER_SIZE;
 	//todo: else in cui avviso che si è buggato il sensore
 	//avg=log10(avg);
 	if(mobileFlag)	{xAvg=xAvg/BUFFER_SIZE;		yAvg=yAvg/BUFFER_SIZE;}
@@ -151,8 +147,8 @@ if(values==NULL && file!=NULL) {
 			LOG_INFO("Avg over threshold");
 			float *arr= malloc ((BUFFER_SIZE+2)*sizeof(float));
 			for(int i=0; i<BUFFER_SIZE;i++)	arr[i]=values[i];
-			arr[BUFFER_SIZE]=xAvg;	arr[BUFFER_SIZE+1]=yAvg;
-			simple_udp_sendto(&udp_conn, values, (BUFFER_SIZE+3)* sizeof(float), &dest_ipaddr);
+			arr[BUFFER_SIZE]=xSensor;	arr[BUFFER_SIZE+1]=ySensor;
+			simple_udp_sendto(&udp_conn, arr, (BUFFER_SIZE+3)* sizeof(float), &dest_ipaddr);
 		}
 		else{
 			LOG_INFO("Avg over threshold mobile device");
