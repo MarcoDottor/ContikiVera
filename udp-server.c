@@ -48,13 +48,10 @@
 #define BUFFER_SIZE 6
 
 #define UDP_BACKEND_PORT 9999
-//#define ind_IPV6 "2620:9b::191d:727f"
 
 static struct simple_udp_connection udp_conn, udp_conn_back;
 static FILE* file;
-static char* nameToSend
-//,*backend_IPv6="2620:9b::191d:727f"
-;
+static char* nameToSend;
 
 char* replace_char(char* str, char find, char replace);
 void formatString(float x,float y,float val);
@@ -75,12 +72,10 @@ udp_rx_callback(struct simple_udp_connection *c,
          uint16_t datalen)
 {
   if(datalen==6*sizeof(char)){	//caso inizializzazione
-  //LOG_INFO("\nSto per mandare il nome del file\n");
 	if(file==NULL) file=fopen("/home/user/contiki-ng-mw-2122/examples/rpl-udp/settingsFile","r");
 	if(nameToSend==NULL) nameToSend=malloc(10*sizeof(char));
  	if(file!=NULL){	
 		fgets(nameToSend,10,file);
-		//LOG_INFO("\nNome file mandato: %s",fullAddress);
   		simple_udp_sendto(&udp_conn, nameToSend, 10*sizeof(char), sender_addr);
 	}
 
@@ -96,18 +91,13 @@ udp_rx_callback(struct simple_udp_connection *c,
 	float *values=(float*) data;	
 	LOG_INFO("\nReceived avgs from mobile device");
 	LOG_INFO("\n avg: %f xAvg: %f yAvg: %f\n",values[0],values[1],values[2]);
-	formatString(values[1],values[2],values[0]);
-  }
-  else if(datalen== 1+3*sizeof(float)){		//caso di sensore fisso che NON ha sfondato la threshold
-	LOG_INFO("\nReceived avgs from sensor");	
-	float *values= (float* ) data;
-	printf("{\"x\":%f,\"y\":%f,\"val\":%f}\n",values[0],values[1],values[2]);
-  }
+	formatString(values[0],values[1],values[2]);
+  }/*
   else if( datalen > sizeof (float)){	//caso di sensore fisso che ha sfondato la threshold	
 	float* values= (float* ) data;
 	LOG_INFO("Received array from sensor");
 	for(int i=0; i<BUFFER_SIZE; i++) formatString(values[BUFFER_SIZE],values[BUFFER_SIZE+1],values[i]);
-  }
+  }*/
 	simple_udp_send(&udp_conn_back, "test", 4*sizeof(char));
 #if WITH_SERVER_REPLY
   /*LOG_INFO("Sending response to ");
@@ -133,7 +123,6 @@ udp_rx_callback_backend(struct simple_udp_connection *c,
 PROCESS_THREAD(udp_server_process, ev, data)
 {
   PROCESS_BEGIN();
-  setlocale(LC_NUMERIC, "French_Canada.1252");
   /* Initialize DAG root */
   NETSTACK_ROUTING.root_start();
   /* Initialize UDP connection */
