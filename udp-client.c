@@ -48,18 +48,14 @@ udp_rx_callback(struct simple_udp_connection *c,
 {
   if(datalen==10*sizeof(char)){
 	flag=1;
-	mobileFlag= (strstr((char*) data, "values")==NULL)?1:0;
+	//mobileFlag= (strstr((char*) data, "values")==NULL)?1:0;
+	mobileFlag= (strstr((char*) data, "m_trace")!=NULL)?1:0;
 	fileName=malloc(70*sizeof (char));
 	strcpy(fileName,"/home/user/contiki-ng-mw-2122/examples/rpl-udp/");
 	strcat(fileName,(char*) data);
 	fileName[strlen(fileName)-1]='\0';
 	process_post(&udp_client_process, init_event, fileName);
   }
-else{
-  LOG_INFO("Received response from ");
-  LOG_INFO_6ADDR(sender_addr);
-  LOG_INFO_("\n");
- }
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
@@ -129,43 +125,32 @@ if(values==NULL && file!=NULL) {
 	//l'if sotto impone che il nodo sia connesso e contenga 6 valori prima di comunicare col router 
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 	if(enough_values_flag){
-	if(avg <= THRESHOLD){
 		float toSend[3];
-		if(mobileFlag)	{
-			toSend[0]=xAvg;
-			toSend[1]=yAvg;
+		if(avg <= THRESHOLD){ //mando medie
+			if(mobileFlag)	{
+				toSend[0]=xAvg;
+				toSend[1]=yAvg;
+			}
+			else{
+				toSend[0]=xSensor;
+				toSend[1]=ySensor;
+			}
+			toSend[2]=avg;		
+		}	
+		else{	//mando i vettori che contiengono tutte le misurazioni 
+			for(int i=0; i<BUFFER_SIZE; i++){
+				if(mobileFlag) {
+					toSend[0]=xPos[i];	
+					toSend[1]=yPos[i];
+				}
+				else {
+					toSend[0]=xSensor;	
+					toSend[1]=ySensor;
+				}	
+				toSend[2]=values[i];
+			}
 		}
-		else{
-			toSend[0]=xSensor;
-			toSend[1]=ySensor;
-		}
-		toSend[2]=avg;	
 		simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float), &dest_ipaddr);
-		/* Send to DAG root *//*
-		   if(!mobileFlag){ //mando media da sensore fisso
-			float toSend[3];	toSend[0]=xSensor; toSend[1]=ySensor;	toSend[2]=avg;
-			simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float)+1, &dest_ipaddr);
-		   }
-		   else{	//mando media da sensore mobile
-			if(mobileData==NULL)	mobileData=malloc (3*sizeof(float));
-			mobileData[0]=avg;
-			mobileData[1]=xAvg;
-			mobileData[2]=yAvg;
-			LOG_INFO("Avg under threshold from mobile device");
-			simple_udp_sendto(&udp_conn, mobileData, 3*sizeof(float), &dest_ipaddr);
-		   }	*/	
-	   }	
-	else{	//adesso devo crare il vettore che contiene i 6 valori, più la media della posizione. Poi fare la parte del server e runnare per vedere se va.	
-		float *arr= malloc ((BUFFER_SIZE+2)*sizeof(float));
-		if(!mobileFlag){
-			arr[BUFFER_SIZE]=xSensor;	arr[BUFFER_SIZE+1]=ySensor;
-		}
-		else{
-			arr[BUFFER_SIZE]=xAvg;	arr[BUFFER_SIZE+1]=yAvg;
-		}
-		for(int i=0; i<BUFFER_SIZE; i++)	arr[i]=values[i];
-		simple_udp_sendto(&udp_conn, arr, (BUFFER_SIZE+2)* sizeof(float), &dest_ipaddr);
-	}
 	}
 	else{
 		LOG_INFO("NO ABBASTANZA VALORI \n");	
