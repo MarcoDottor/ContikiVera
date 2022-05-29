@@ -37,7 +37,7 @@ static process_event_t init_event;
 PROCESS(udp_client_process, "UDP client");
 AUTOSTART_PROCESSES(&udp_client_process);
 /*---------------------------------------------------------------------------*/
-static void
+static void	//WHENEVER A MESSAGE IS RECEIVED THIS METHOD GETS CALLED
 udp_rx_callback(struct simple_udp_connection *c,
          const uip_ipaddr_t *sender_addr,
          uint16_t sender_port,
@@ -46,19 +46,18 @@ udp_rx_callback(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  if(datalen==10*sizeof(char)){
+  if(datalen==10*sizeof(char)){	//10 IS THE SIZE GIVEN TO THE MESSAGE CONTAINING THE NAME OF THE FILE TO READ
 	flag=1;
-	//mobileFlag= (strstr((char*) data, "values")==NULL)?1:0;
-	mobileFlag= (strstr((char*) data, "m_trace")!=NULL)?1:0;
+	mobileFlag= (strstr((char*) data, "m_trace")!=NULL)?1:0;  //FILE FOR MOBILE TRACES CONTAIN "m_trace" in their name
 	fileName=malloc(70*sizeof (char));
 	strcpy(fileName,"/home/user/contiki-ng-mw-2122/examples/rpl-udp/");
-	strcat(fileName,(char*) data);
-	fileName[strlen(fileName)-1]='\0';
-	process_post(&udp_client_process, init_event, fileName);
+	strcat(fileName,(char*) data);	//GENERATE THE CORRECT NAME OF THE FILE
+	fileName[strlen(fileName)-1]='\0';	//NECESSARY TO CHANGE \n AT THE END, WHICH GIVES PROBLEMS
+	process_post(&udp_client_process, init_event, fileName);	//CREATES AN EVENT NECESSARY TO CONTINUE THE PROGRAM, LOOK AT LINES 80-81
   }
 }
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(udp_client_process, ev, data)
+PROCESS_THREAD(udp_client_process, ev, data)	//STARTS HERE
 {
   static struct etimer periodic_timer, initialDelayTimer;
   uip_ipaddr_t dest_ipaddr;
@@ -66,53 +65,53 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PROCESS_BEGIN();
   /* Initialize UDP connection */
   simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
-                      UDP_SERVER_PORT, udp_rx_callback);
-  etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
+                      UDP_SERVER_PORT, udp_rx_callback);	//TRIES TO CONNECT TO THE UDP-SERVER
+  etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);	//SETS A TIMER TO SIMULATE REAL-WORLD BEHAVIOR
 
 while(flag==0){
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-	if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr))
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));	//PAUSES EACH TIME IT TRIES
+	if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) //CHECKS IF CONNECTED TO SERVER
 		flag=1;
-    etimer_set(&periodic_timer, INIT_INTERVAL - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
+    etimer_set(&periodic_timer, INIT_INTERVAL - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));	//SETS A TIMER TO SIMULATE REAL-WORLD BEHAVIOR
 }
 flag=0;
-simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);
+simple_udp_sendto(&udp_conn, "Values", 6 * sizeof(char), &dest_ipaddr);	//SENDS A MESSAGE TO ASK FOR THE NAME OF THE FILE TO READ
 
-PROCESS_WAIT_EVENT();//entra qui!vedere come creare il percorso giusto!
-if(ev==init_event){}
+PROCESS_WAIT_EVENT();	//WAITS FOR ANY EVENT
+if(ev==init_event){}	//IN CALLBACK (ROW 57) AN INIT_EVEN IS CREATED WHEN A REPLY IS RECEIVED FROM THE SERVER
 
 if(file==NULL)	 file= fopen(fileName,"r");
 if(values==NULL && file!=NULL) {
 	values= malloc(BUFFER_SIZE* sizeof(float));
 	for(int i=0; i<BUFFER_SIZE; i++) values[i]=-1;
-	if(mobileFlag){
+	if(mobileFlag){	//POSITIONS FOR EACH RECORDING ARE STORED IN A VECTOR
 		xPos= malloc(BUFFER_SIZE* sizeof(float));
 		yPos= malloc(BUFFER_SIZE* sizeof(float));
 	}
 } 
   while(!feof(file)) {
-      if(ind==5) {enough_values_flag=1;}
+      if(ind==5) {enough_values_flag=1;} //THIS FLAG IS TRUE IF I'VE READ AT LEAST 6 VALUES, AND REMAINS TRUE FOR ALL THE DURATION OF THE PROGRAM
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
-	if(!mobileFlag) {
-		if(ind==0 && !enough_values_flag){//primo giro
+	if(!mobileFlag) {//STATIC SENSOR
+		if(ind==0 && !enough_values_flag){//IF I HAVN'T READ ANY VALUES YET, I KNOW THE FIRST TWO ARE X AND Y OF THE STATIC SENSOR
 		static float a,b;
 		fscanf(file,"%f %f",&a, &b);
 		xSensor=a; ySensor=b;
 		}
-		fscanf(file,"%f",&values[ind]);
+		fscanf(file,"%f",&values[ind]); //ALL OTHER VALUES ARE NOISE LEVELS
 		LOG_INFO("\nHo letto il valore %f\n", values[ind]);
 	}
-	else {
-		if(ind==0 && !enough_values_flag){//primo giro
-		int initialWait;
-		fscanf(file,"%d",&initialWait);
-    		etimer_set(&initialDelayTimer, initialWait);
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&initialDelayTimer));
+	else {//MOBILE SENSOR
+		if(ind==0 && !enough_values_flag){//CHECK IF I HAVN'T READ ANY VALUES YET, AND SETS AN INITIAL WAIT TO SIMULATE REAL WORLD BEHAVIOR
+			int initialWait;
+			fscanf(file,"%d",&initialWait);
+	    		etimer_set(&initialDelayTimer, initialWait);
+			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&initialDelayTimer));
 		}	
-		fscanf(file,"%f %f %f",&values[ind],&xPos[ind],&yPos[ind]);
+		fscanf(file,"%f %f %f",&values[ind],&xPos[ind],&yPos[ind]);//ALL OTHER LINES ARE NOISE LEVELS AND THEIR POSITIONS
 		LOG_INFO("\nHo letto i valori x:%f y:%f val:%f\n",xPos[ind],yPos[ind],values[ind]);
 	}
-	avg=0, xAvg=0, yAvg=0;
+	avg=0, xAvg=0, yAvg=0;	//COMPUTE NOISE AVG, AND POSITION AVG FOR MOBILE SENSORS
 	for(int i=0; i<BUFFER_SIZE; i++){
 		avg+= values[i];	
 		if(mobileFlag){
@@ -126,7 +125,7 @@ if(values==NULL && file!=NULL) {
     if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
 	if(enough_values_flag){
 		float toSend[3];
-		if(avg <= THRESHOLD){ //mando medie
+		if(avg <= THRESHOLD){ //SENDING AVG
 			if(mobileFlag)	{
 				toSend[0]=xAvg;
 				toSend[1]=yAvg;
@@ -135,9 +134,10 @@ if(values==NULL && file!=NULL) {
 				toSend[0]=xSensor;
 				toSend[1]=ySensor;
 			}
-			toSend[2]=avg;		
+			toSend[2]=avg;	
+			simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float), &dest_ipaddr);//SENDING THE ARRAY CREATED ABOVE	
 		}	
-		else{	//mando i vettori che contiengono tutte le misurazioni 
+		else{	//SENDING ALL VALUES 
 			for(int i=0; i<BUFFER_SIZE; i++){
 				if(mobileFlag) {
 					toSend[0]=xPos[i];	
@@ -148,14 +148,14 @@ if(values==NULL && file!=NULL) {
 					toSend[1]=ySensor;
 				}	
 				toSend[2]=values[i];
+				simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float), &dest_ipaddr);//SENDING THE ARRAYS CREATED ABOVE
 			}
 		}
-		simple_udp_sendto(&udp_conn, toSend, 3*sizeof(float), &dest_ipaddr);
 	}
 	else{
 		LOG_INFO("NO ABBASTANZA VALORI \n");	
 	}
-      ind=(ind+1)%BUFFER_SIZE;
+      ind=(ind+1)%BUFFER_SIZE;	//CHANGE THE INDEX TO UPDATE WITH NEW VALUES
     } else {
       LOG_INFO("Not reachable yet\n");
     }
